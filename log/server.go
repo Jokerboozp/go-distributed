@@ -14,7 +14,7 @@ type fileLog string
 func (fl fileLog) Write(data []byte) (int, error) {
 
 	//打开文件
-	f, err := os.OpenFile(string(fl), os.O_CREATE|os.O_RDONLY|os.O_APPEND, 0600)
+	f, err := os.OpenFile(string(fl), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return 0, err
 	}

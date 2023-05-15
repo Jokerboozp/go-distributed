@@ -14,12 +14,12 @@ func Start(ctx context.Context, serviceName, host, port string, registerHandlers
 }
 
 func startService(ctx context.Context, serviceName, host, port string) context.Context {
-	ctx, cancle := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	var srv http.Server
-	srv.Addr = ":" + port
+	srv.Addr = host + ":" + port
 	go func() {
 		log.Println(srv.ListenAndServe())
-		cancle()
+		cancel()
 	}()
 
 	go func() {
@@ -27,7 +27,7 @@ func startService(ctx context.Context, serviceName, host, port string) context.C
 		var s string
 		fmt.Scanln(&s)
 		srv.Shutdown(ctx)
-		cancle()
+		cancel()
 	}()
 	return ctx
 }
