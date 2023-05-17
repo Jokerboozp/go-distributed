@@ -11,5 +11,6 @@ type ServiceName string
 
 // 定义一个常量 LogService 的值为 ServiceName("LogService")
 const (
-	LogService = ServiceName("LogService")
+	LogService     = ServiceName("LogService")
+	GradingService = ServiceName("GradingService")
 )
