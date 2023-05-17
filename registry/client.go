@@ -24,3 +24,19 @@ func RegisterService(r Registration) error { // 定义RegisterService函数并�
 	}
 	return nil // 返回空值
 }
+
+func ShutDownService(url string) error {
+	req, err := http.NewRequest(http.MethodDelete, ServicesUrl, bytes.NewBuffer([]byte(url)))
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Content-Type", "text/plain")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to deregister service. Registry "+"service responed with code %v", res.StatusCode)
+	}
+	return nil
+}

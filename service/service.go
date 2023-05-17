@@ -29,13 +29,21 @@ func startService(ctx context.Context, serviceName registry.ServiceName, host, p
 
 	go func() {
 		log.Println(srv.ListenAndServe()) // 启动HTTP服务器
-		cancel()                          // 如果启动失败，将取消上下文传递给cancel变量
+		err := registry.ShutDownService(fmt.Sprintf("http://%s:%s", host, port))
+		if err != nil {
+			log.Fatal(err)
+		}
+		cancel() // 如果启动失败，将取消上下文传递给cancel变量
 	}()
 
 	go func() {
 		fmt.Printf("%v started.Press any key to stop\n", serviceName) // 输出服务名称并提示用户按任意键停止服务
 		var s string
-		fmt.Scanln(&s)    // 用户按下任意键
+		fmt.Scanln(&s) // 用户按下任意键
+		err := registry.ShutDownService(fmt.Sprintf("http://%s:%s", host, port))
+		if err != nil {
+			log.Fatal(err)
+		}
 		srv.Shutdown(ctx) // 关闭HTTP服务器
 		cancel()          // 取消上下文传递给cancel变量
 	}()

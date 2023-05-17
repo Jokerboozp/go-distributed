@@ -2,6 +2,8 @@ package registry
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
@@ -25,6 +27,18 @@ func (r *registry) add(reg Registration) error {
 	r.registrations = append(r.registrations, reg)
 	r.mutex.Unlock()
 	return nil
+}
+
+func (r *registry) remove(url string) error {
+	for i := range reg.registrations {
+		if reg.registrations[i].ServiceUrl == url {
+			r.mutex.Lock()
+			reg.registrations = append(reg.registrations[:i], reg.registrations[i+1:]...)
+			r.mutex.Unlock()
+			return nil
+		}
+	}
+	return fmt.Errorf("service at URL %s not found", url)
 }
 
 // 创建 registry 类型变量 reg，初始化其中的 registrations 和 mutex 字段
@@ -55,6 +69,21 @@ func (s RegistryService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {                                                               // 如果 add 方法返回了错误
 			log.Println(err) // 输出错误日志
 			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	case http.MethodDelete:
+		payload, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		url := string(payload)
+		log.Printf("removing service at URL : %s", url)
+		err = reg.remove(url)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	default: // 如果请求方法不是 POST
