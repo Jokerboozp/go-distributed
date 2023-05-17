@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -18,7 +19,7 @@ const ServicesUrl = "http://localhost" + ServerPort + "/services"
 // 声明 struct registry，包含 registrations 和 mutex 两个字段
 type registry struct {
 	registrations []Registration // 存储服务注册信息的切片
-	mutex         *sync.Mutex    // 互斥锁，防止多个 goroutine 同时修改 registrations 切片
+	mutex         *sync.RWMutex  // 互斥锁，防止多个 goroutine 同时修改 registrations 切片
 }
 
 // 定义 registry 的 add 方法，向 registrations 切片中添加 Registration，加锁确保并发安全
@@ -26,12 +27,97 @@ func (r *registry) add(reg Registration) error {
 	r.mutex.Lock()
 	r.registrations = append(r.registrations, reg)
 	r.mutex.Unlock()
+	err := r.sendRequiredServices(reg)
+	r.notify(patch{
+		Added: []patchEntry{
+			{
+				Name: reg.ServiceName,
+				URL:  reg.ServiceUrl,
+			},
+		},
+	})
+	return err
+}
+
+func (r registry) notify(fullPatch patch) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	for _, reg := range r.registrations {
+		go func(reg Registration) {
+			for _, reqService := range reg.RequiredServices {
+				p := patch{
+					Added:   []patchEntry{},
+					Removed: []patchEntry{},
+				}
+				sendUpdate := false
+				for _, added := range fullPatch.Added {
+					if added.Name == reqService {
+						p.Added = append(p.Added, added)
+						sendUpdate = true
+					}
+				}
+				for _, removed := range fullPatch.Removed {
+					if removed.Name == reqService {
+						p.Removed = append(p.Removed, removed)
+						sendUpdate = true
+					}
+				}
+				if sendUpdate {
+					err := r.sendPatch(p, reg.ServiceUpdateURL)
+					if err != nil {
+						log.Println(err)
+						return
+					}
+				}
+			}
+		}(reg)
+	}
+}
+
+func (r registry) sendRequiredServices(reg Registration) error {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	var p patch
+	for _, serviceReg := range r.registrations {
+		for _, reqService := range reg.RequiredServices {
+			if serviceReg.ServiceName == reqService {
+				p.Added = append(p.Added, patchEntry{
+					Name: serviceReg.ServiceName,
+					URL:  serviceReg.ServiceUrl,
+				})
+			}
+		}
+	}
+	err := r.sendPatch(p, reg.ServiceUpdateURL)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r registry) sendPatch(p patch, url string) error {
+	d, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	_, err = http.Post(url, "application/json", bytes.NewBuffer(d))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (r *registry) remove(url string) error {
 	for i := range reg.registrations {
 		if reg.registrations[i].ServiceUrl == url {
+			r.notify(patch{
+				Removed: []patchEntry{
+					{
+						Name: r.registrations[i].ServiceName,
+						URL:  r.registrations[i].ServiceUrl,
+					},
+				},
+			})
 			r.mutex.Lock()
 			reg.registrations = append(reg.registrations[:i], reg.registrations[i+1:]...)
 			r.mutex.Unlock()
@@ -44,7 +130,7 @@ func (r *registry) remove(url string) error {
 // 创建 registry 类型变量 reg，初始化其中的 registrations 和 mutex 字段
 var reg = registry{
 	registrations: make([]Registration, 0), // 初始化 registrations 为空切片
-	mutex:         new(sync.Mutex),         // 初始化 mutex 为空互斥锁
+	mutex:         new(sync.RWMutex),       // 初始化 mutex 为空互斥锁
 }
 
 // 声明 RegistryService 类型

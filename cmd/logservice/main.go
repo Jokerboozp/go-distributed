@@ -19,8 +19,10 @@ func main() {
 	serviceAddress := fmt.Sprintf("http://%s:%s", host, port)
 	// 创建一个registry registration，使用"LogService"作为服务名称，使用serviceAddress作为服务URL
 	r := registry.Registration{
-		ServiceName: registry.LogService,
-		ServiceUrl:  serviceAddress,
+		ServiceName:      registry.LogService,
+		ServiceUrl:       serviceAddress,
+		RequiredServices: make([]registry.ServiceName, 0),
+		ServiceUpdateURL: serviceAddress + "/services",
 	}
 	// 使用给定参数启动服务，并存储上下文和错误值
 	ctx, err := service.Start(context.Background(), host, port, log.RegisterHandlers, r)
