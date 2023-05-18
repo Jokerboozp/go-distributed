@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // 声明常量 ServerPort，并赋值为 ":3000"
@@ -157,6 +158,77 @@ func (r *registry) remove(url string) error {
 	}
 	// 如果未找到要删除的服务，则返回一个错误
 	return fmt.Errorf("service at URL %s not found", url)
+}
+
+// 定义了 `registry` 结构体的 `heartbeat` 方法
+func (r *registry) heartbeat(freq time.Duration) {
+	// 无限循环
+	for {
+		// 创建 waitgroup
+		var wg sync.WaitGroup
+		// 遍历 Registration 的切片 r.registrations
+		for _, reg := range r.registrations {
+			// 增加 waitgroup 的计数器
+			wg.Add(1)
+			// 启动协程
+			go func(reg Registration) {
+				// 协程结束前调用 Done 函数，减少 waitgroup 计数器
+				defer wg.Done()
+
+				// 初始化 success 变量为 true
+				success := true
+
+				// 尝试三次心跳检测
+				for attemps := 0; attemps < 3; attemps++ {
+
+					// 发送 GET 请求
+					res, err := http.Get(reg.HeartBeatURL)
+
+					// 如果请求失败，打印错误信息
+					if err != nil {
+						log.Println(err)
+
+						// 如果请求成功，且状态码为 200
+					} else if res.StatusCode == http.StatusOK {
+						// 打印成功信息
+						log.Printf("heartbeat check passed for %v", reg.ServiceName)
+						// 如果之前的检测失败了，则重新添加注册信息
+						if !success {
+							r.add(reg)
+						}
+						// 跳出循环
+						break
+					}
+
+					// 如果请求不成功
+					log.Printf("heartbeat check failed for %v", reg.ServiceName)
+
+					// 如果检测之前成功过
+					if success {
+						// 设置 success 为 false
+						success = false
+						// 删除注册信息
+						r.remove(reg.ServiceUrl)
+					}
+
+					// 等待 1 秒钟再进行下一次心跳检测
+					time.Sleep(1 * time.Second)
+				}
+			}(reg)
+			// 等待所有协程执行完毕
+			wg.Wait()
+			// 等待指定时间再进入下一轮循环
+			time.Sleep(freq)
+		}
+	}
+}
+
+var once sync.Once
+
+func SetupRegistryService() {
+	once.Do(func() {
+		go reg.heartbeat(3 * time.Second)
+	})
 }
 
 // 创建 registry 类型变量 reg，初始化其中的 registrations 和 mutex 字段

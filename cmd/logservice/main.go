@@ -23,6 +23,7 @@ func main() {
 		ServiceUrl:       serviceAddress,
 		RequiredServices: make([]registry.ServiceName, 0),
 		ServiceUpdateURL: serviceAddress + "/services",
+		HeartBeatURL:     serviceAddress + "/heartbeat",
 	}
 	// 使用给定参数启动服务，并存储上下文和错误值
 	ctx, err := service.Start(context.Background(), host, port, log.RegisterHandlers, r)

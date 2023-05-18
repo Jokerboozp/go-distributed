@@ -10,6 +10,7 @@ import (
 
 // 定义 main 函数
 func main() {
+	registry.SetupRegistryService()
 	// 注册服务，注册地址为 "/services"，使用 RegistryService 结构体作为处理器
 	http.Handle("/services", &registry.RegistryService{})
 

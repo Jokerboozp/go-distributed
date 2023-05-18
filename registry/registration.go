@@ -6,6 +6,7 @@ type Registration struct {
 	ServiceUrl       string
 	RequiredServices []ServiceName
 	ServiceUpdateURL string
+	HeartBeatURL     string
 }
 
 // 定义一个 ServiceName 类型为 string
